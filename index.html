@@ -325,6 +325,14 @@
       return `${day}/${month}/${yearBE} ${hours}:${minutes}:${seconds}`;
     }
 
+    // รอผลไม่เกินเวลาที่กำหนด เพื่อไม่ให้หน้าจอค้างหมุนไม่หยุด
+    function withTimeout(promise, ms) {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('หมดเวลารอการตอบกลับจากเซิร์ฟเวอร์')), ms))
+      ]);
+    }
+
     async function apiCall(action, payload = {}) {
       const requestData = { action, ...payload };
       
@@ -342,7 +350,12 @@
           },
           body: JSON.stringify(requestData)
         });
-        return await response.json();
+        const raw = await response.text();
+        try {
+          return JSON.parse(raw);
+        } catch (e) {
+          throw new Error('เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง (HTTP ' + response.status + ')');
+        }
       }
     }
 
@@ -1307,7 +1320,6 @@
 
     function saveChanges() {
       const inputs = document.querySelectorAll('.edit-input');
-      const updatedData = [];
       let dateValid = true;
 
       inputs.forEach(input => {
@@ -1351,7 +1363,9 @@
         confirmButtonText: 'บันทึก',
         cancelButtonText: 'ยกเลิก',
         showLoaderOnConfirm: true,
+        allowOutsideClick: () => !Swal.isLoading(),
         preConfirm: async () => {
+          const updatedData = [];
           inputs.forEach(input => {
             if (input.readOnly || input.disabled) return;   // ส่งเฉพาะช่องที่เปิดให้แก้ไข
             const idx = input.getAttribute('data-index');
@@ -1372,11 +1386,18 @@
             }
           });
 
-          return await apiCall("updateData", { 
-            teamId: currentTeamId, 
-            updatedValues: updatedData,
-            email: loggedEmail
-          });
+          try {
+            const res = await withTimeout(apiCall("updateData", { 
+              teamId: currentTeamId, 
+              updatedValues: updatedData,
+              email: loggedEmail
+            }), 90000);
+            return (res === undefined || res === null) ? '❌ ไม่ได้รับผลตอบกลับจากเซิร์ฟเวอร์' : res;
+          } catch (err) {
+            // หยุดหมุน และแจ้งในหน้าต่างเดิม ให้กดบันทึกซ้ำหรือยกเลิกได้
+            Swal.showValidationMessage(`${err.message} — ข้อมูลอาจบันทึกแล้ว กรุณาเลือก Team ID ใหม่เพื่อตรวจสอบ`);
+            return false;
+          }
         }
       }).then((result) => {
         if (result.isConfirmed) {
@@ -1393,6 +1414,8 @@
             }
           });
         }
+      }).catch(err => {
+        Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: (err && err.message) || String(err) });
       });
     }
   </script>

@@ -1112,7 +1112,8 @@
           ${createInput("Category", true, "col-md-6")}
           
           <div class="col-12"><div class="section-header">Coach Info</div></div>
-          ${["Coach Name", "Email", "Tel", "Line ID"].map(l => createInput(l, false, "col-md-6")).join('')}
+          ${["Coach Name (1)", "Coach Name (2)"].map(l => createInput(l, false, "col-md-6")).join('')}
+          ${["Email", "Tel", "Line ID"].map(l => createInput(l, false, "col-md-4")).join('')}
           
           <div class="col-12">
             <div class="section-header d-flex justify-content-between align-items-center flex-wrap gap-2">

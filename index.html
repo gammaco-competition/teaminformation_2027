@@ -741,6 +741,17 @@
       return limits;
     }
 
+    /** สิทธิ์เพิ่ม/แก้ไข Coach Name (2) ตาม Age Group (ไม่ได้ตั้ง = อนุญาต) */
+    function getCoach2RulesFromUI() {
+      const rules = { ...(currentConfig && currentConfig.coach2Allowed ? currentConfig.coach2Allowed : {}) };
+      document.querySelectorAll('.cat-rule-row').forEach(row => {
+        const grp = row.getAttribute('data-cat');
+        const chk = row.querySelector('.coach2-allow');
+        if (grp && chk) rules[grp] = chk.checked;
+      });
+      return rules;
+    }
+
     function updateCategoryRulesBySelectedEvents() {
       const selectedEvents = getCurrentlySelectedEvents();
       const currentRules = getCurrentCategoryRulesFromUI();
@@ -756,10 +767,11 @@
         });
       }
       const currentLimits = getMemberLimitsFromUI();
-      renderCategoryRulesUI(filteredEventCategories, currentRules, currentLimits);
+      const currentCoach2 = getCoach2RulesFromUI();
+      renderCategoryRulesUI(filteredEventCategories, currentRules, currentLimits, currentCoach2);
     }
 
-    function renderCategoryRulesUI(eventCategories, existingRules = {}, existingLimits = {}) {
+    function renderCategoryRulesUI(eventCategories, existingRules = {}, existingLimits = {}, existingCoach2 = {}) {
       const container = document.getElementById('cfgCategoryRulesContainer');
       if (!eventCategories || Object.keys(eventCategories).length === 0) {
         container.innerHTML = '<div class="text-muted p-2">ไม่พบ Age Group สำหรับรายการที่เลือก</div>';
@@ -777,6 +789,8 @@
             const maxBE = rule.maxYear + 543;
 
             const lim = clampLimit((existingLimits[cat] || DEFAULT_MEMBER_LIMIT).min, (existingLimits[cat] || DEFAULT_MEMBER_LIMIT).max);
+            const coach2On = existingCoach2[cat] !== false;
+            const c2Id = 'c2_' + Math.random().toString(36).slice(2, 9);
 
             html += `
               <div class="mb-2 p-2 bg-light rounded cat-rule-row" data-cat="${escapeHtml(cat)}">
@@ -809,6 +823,13 @@
                     <input type="number" min="1" max="${MAX_MEMBER_SLOTS}" class="form-control form-control-sm ml-max" style="width: 85px;" value="${lim.max}">
                   </div>
                   <span style="font-size: 0.75rem;" class="text-muted">คน</span>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap mt-1">
+                  <div style="width: 140px; font-size: 0.75rem;" class="text-muted">👤 Coach Name (2)</div>
+                  <div class="form-check form-switch m-0">
+                    <input class="form-check-input coach2-allow" type="checkbox" role="switch" id="${c2Id}" ${coach2On ? 'checked' : ''}>
+                    <label class="form-check-label" for="${c2Id}" style="font-size: 0.75rem;">อนุญาตให้เพิ่ม / แก้ไข</label>
+                  </div>
                 </div>
               </div>
             `;
@@ -1019,7 +1040,8 @@
           bannerUrl: bannerUrls[0],
           activeEvent: selectedEvents.length === 0 ? "ALL" : selectedEvents,
           categoryYearRules: categoryYearRules,
-          memberLimits: getMemberLimitsFromUI()
+          memberLimits: getMemberLimitsFromUI(),
+          coach2Allowed: getCoach2RulesFromUI()
         };
 
         const res = await apiCall("saveConfig", { config: newConfig, email: loggedEmail });
@@ -1112,7 +1134,7 @@
           ${createInput("Category", true, "col-md-6")}
           
           <div class="col-12"><div class="section-header">Coach Info</div></div>
-          ${["Coach Name (1)", "Coach Name (2)"].map(l => createInput(l, false, "col-md-6")).join('')}
+          ${["Coach Name (1)", "Coach Name (2)"].map(l => createInput(l, false, fieldMap["Coach Name (2)"] ? "col-md-6" : "col-md-12")).join('')}
           ${["Email", "Tel", "Line ID"].map(l => createInput(l, false, "col-md-4")).join('')}
           
           <div class="col-12">
